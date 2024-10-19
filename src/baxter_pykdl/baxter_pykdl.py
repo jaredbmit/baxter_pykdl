@@ -28,12 +28,13 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import numpy as np
+
+import sys
+sys.path.append(f"{sys.prefix}/lib/python{sys.version_info.major}.{sys.version_info.minor}/dist-packages")
 import PyKDL
 
-import rospy
-
-import baxter_interface
-
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from baxter_kdl.kdl_parser import kdl_tree_from_urdf_model
 from urdf_parser_py.urdf import URDF
 
@@ -41,8 +42,9 @@ class baxter_kinematics(object):
     """
     Baxter Kinematics with PyKDL
     """
-    def __init__(self, limb):
-        self._baxter = URDF.from_parameter_server(key='robot_description')
+    def __init__(self, xml_file, limb):
+        with open(xml_file, 'r') as file:
+            self._baxter = URDF.from_xml_string(file.read())
         self._kdl_tree = kdl_tree_from_urdf_model(self._baxter)
         self._base_link = self._baxter.get_root()
         self._tip_link = limb + '_gripper'
@@ -50,9 +52,7 @@ class baxter_kinematics(object):
         self._arm_chain = self._kdl_tree.getChain(self._base_link,
                                                   self._tip_link)
 
-        # Baxter Interface Limb Instances
-        self._limb_interface = baxter_interface.Limb(limb)
-        self._joint_names = self._limb_interface.joint_names()
+        self._joint_names = ['right_s0', 'right_s1', 'right_e0', 'right_e1', 'right_w0', 'right_w1', 'right_w2']
         self._num_jnts = len(self._joint_names)
 
         # KDL Solvers
@@ -71,28 +71,20 @@ class baxter_kinematics(object):
         for j in self._baxter.joints:
             if j.type != 'fixed':
                 nf_joints += 1
-        print "URDF non-fixed joints: %d;" % nf_joints
-        print "URDF total joints: %d" % len(self._baxter.joints)
-        print "URDF links: %d" % len(self._baxter.links)
-        print "KDL joints: %d" % self._kdl_tree.getNrOfJoints()
-        print "KDL segments: %d" % self._kdl_tree.getNrOfSegments()
+        print("URDF non-fixed joints: %d;" % nf_joints)
+        print("URDF total joints: %d" % len(self._baxter.joints))
+        print("URDF links: %d" % len(self._baxter.links))
+        print("KDL joints: %d" % self._kdl_tree.getNrOfJoints())
+        print("KDL segments: %d" % self._kdl_tree.getNrOfSegments())
 
     def print_kdl_chain(self):
-        for idx in xrange(self._arm_chain.getNrOfSegments()):
-            print '* ' + self._arm_chain.getSegment(idx).getName()
+        for idx in range(self._arm_chain.getNrOfSegments()):
+            print('* ' + self._arm_chain.getSegment(idx).getName())
 
-    def joints_to_kdl(self, type, values=None):
+    def joints_to_kdl(self, type, values):
         kdl_array = PyKDL.JntArray(self._num_jnts)
 
-        if values is None:
-            if type == 'positions':
-                cur_type_values = self._limb_interface.joint_angles()
-            elif type == 'velocities':
-                cur_type_values = self._limb_interface.joint_velocities()
-            elif type == 'torques':
-                cur_type_values = self._limb_interface.joint_efforts()
-        else:
-            cur_type_values = values
+        cur_type_values = values
         
         for idx, name in enumerate(self._joint_names):
             kdl_array[idx] = cur_type_values[name]
@@ -126,13 +118,13 @@ class baxter_kinematics(object):
     def inverse_kinematics(self, position, orientation=None, seed=None):
         ik = PyKDL.ChainIkSolverVel_pinv(self._arm_chain)
         pos = PyKDL.Vector(position[0], position[1], position[2])
-        if orientation != None:
+        if orientation is not None:
             rot = PyKDL.Rotation()
             rot = rot.Quaternion(orientation[0], orientation[1],
                                  orientation[2], orientation[3])
         # Populate seed with current angles if not provided
         seed_array = PyKDL.JntArray(self._num_jnts)
-        if seed != None:
+        if seed is not None:
             seed_array.resize(len(seed))
             for idx, jnt in enumerate(seed):
                 seed_array[idx] = jnt
@@ -140,7 +132,7 @@ class baxter_kinematics(object):
             seed_array = self.joints_to_kdl('positions')
 
         # Make IK Call
-        if orientation:
+        if orientation is not None:
             goal_pose = PyKDL.Frame(rot, pos)
         else:
             goal_pose = PyKDL.Frame(pos)

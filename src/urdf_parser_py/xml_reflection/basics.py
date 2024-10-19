@@ -54,7 +54,7 @@ def to_yaml(obj):
     elif hasattr(obj, 'to_yaml'):
         out = obj.to_yaml()
     elif isinstance(obj, etree._Element):
-    	out = etree.tostring(obj, pretty_print = True)
+        out = etree.tostring(obj, pretty_print=True)
     elif type(obj) == dict:
         out = {}
         for (var, value) in obj.items():

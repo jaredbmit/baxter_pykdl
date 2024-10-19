@@ -326,7 +326,7 @@ class Link(xmlr.Object):
 		self.inertial = inertial
 		self.collision = collision
 		self.origin = origin
-                self.gravity = gravity
+		self.gravity = gravity
 
 xmlr.reflect(Link, params = [
 	name_attribute,
